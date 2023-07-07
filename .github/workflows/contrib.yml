@@ -1,0 +1,49 @@
+name: Build and Publish Clickhouse Contrib
+
+on:
+  push:
+    branches:
+      - '*'
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+        with:
+          repository: zhu733756/Clickhouse
+          ref: ${{ github.ref }}
+
+      - name: Update Submodules
+        run: git submodule update --init --recursive
+
+      - name: Compress contrib Directory
+        run: tar -czf contrib.tar contrib
+
+      - name: Make Dockerfile
+        run: |
+          cat <<EOF >Dockerfile
+          FROM ubuntu:latest
+
+          RUN apt-get update \
+              && apt-get install -y tar gzip
+
+          WORKDIR /app
+
+          COPY controb /app/controb
+          EOF
+          
+      - name: Configure Docker Login
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and Publish Docker Image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          push: true
+          tags: zhu733756/clickhouse-contrib:${{ github.ref_name }}
